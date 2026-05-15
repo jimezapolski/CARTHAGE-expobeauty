@@ -755,37 +755,71 @@ renderCat('all');
 function toggleDetail(btn){
   const d=btn.nextElementSibling,open=d.classList.contains('open');
 }
-async function handleReg(e){
+// ── ICS generado 100% en el browser (sin servidor) ──────────────────────────
+const DEMOS_SCHED = [
+  { nombre:'Bio-Regeneración Capilar con Dermapen y Exosomas',             fecha:'20260516', hora:'1130', durMin:60 },
+  { nombre:'Workshop: Regeneración cutánea inteligente',                   fecha:'20260516', hora:'1310', durMin:60 },
+  { nombre:'Ritual Sculpt & Glow con Gua Shas y Máscara Bio-Regeneradora', fecha:'20260516', hora:'1530', durMin:60 },
+  { nombre:'Lanzamiento DNA PRO: PDRN Vegano, NAD+ y Efecto Piel Cristal', fecha:'20260516', hora:'1700', durMin:60 },
+  { nombre:'Workshop: La nueva arquitectura de la bioregeneración cutánea', fecha:'20260517', hora:'1230', durMin:60 },
+  { nombre:'DNA PRO + Exosomas: La Nueva Era de la Biotecnología Celular',  fecha:'20260517', hora:'1315', durMin:60 },
+  { nombre:'Estrategia Despigmentante Multitécnicas con Exosomas',          fecha:'20260517', hora:'1530', durMin:60 },
+  { nombre:'Protocolo de Biorevitalización: Máscara, Exosomas y PDRN Vegano', fecha:'20260517', hora:'1700', durMin:60 },
+];
+
+function icsAddMin(fecha, hora, min) {
+  const h = parseInt(hora.slice(0,2)), m = parseInt(hora.slice(2,4));
+  const t = h*60 + m + min;
+  return fecha+'T'+String(Math.floor(t/60)%24).padStart(2,'0')+String(t%60).padStart(2,'0')+'00';
+}
+function icsEsc(s){ return s.replace(/[\\,;]/g,c=>'\\'+c).replace(/\n/g,'\\n'); }
+
+function buildICS(demos) {
+  const todos = DEMOS_SCHED.map(d=>d.nombre);
+  const sel   = demos.includes('Todos los workshops y demos') ? todos : demos.filter(s=>todos.includes(s));
+  const evts  = DEMOS_SCHED.filter(d=>sel.includes(d.nombre)).map(d=>[
+    'BEGIN:VEVENT',
+    `UID:${Math.random().toString(36).slice(2)}${Date.now()}@carthage-expobeauty`,
+    `DTSTART;TZID=America/Argentina/Buenos_Aires:${d.fecha}T${d.hora}00`,
+    `DTEND;TZID=America/Argentina/Buenos_Aires:${icsAddMin(d.fecha,d.hora,d.durMin)}`,
+    `SUMMARY:${icsEsc(d.nombre)}`,
+    'DESCRIPTION:Stand N°2 · ExpoBeauty 2026 · Carthage',
+    'LOCATION:Stand N°2 · ExpoBeauty 2026',
+    'BEGIN:VALARM','TRIGGER:-PT30M','ACTION:DISPLAY',
+    `DESCRIPTION:🌿 En 30 min: ${icsEsc(d.nombre)} · Stand N°2`,'END:VALARM',
+    'BEGIN:VALARM','TRIGGER:-PT10M','ACTION:DISPLAY',
+    `DESCRIPTION:⚡ En 10 min: ${icsEsc(d.nombre)} · Stand N°2`,'END:VALARM',
+    'END:VEVENT',
+  ].join('\r\n'));
+  return ['BEGIN:VCALENDAR','VERSION:2.0',
+    'PRODID:-//Carthage ExpoBeauty 2026//ES','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+    'X-WR-CALNAME:Carthage ExpoBeauty 2026','X-WR-TIMEZONE:America/Argentina/Buenos_Aires',
+    ...evts,'END:VCALENDAR'].join('\r\n');
+}
+
+function handleReg(e){
   e.preventDefault();
   const btn = document.getElementById('btnRegistrar');
-  btn.disabled = true;
-  btn.textContent = 'Guardando…';
-
   const nombre = document.getElementById('inputNombre').value.trim();
-  const demos = [...document.querySelectorAll('input[name="demos"]:checked')].map(cb => cb.value);
+  const demos  = [...document.querySelectorAll('input[name="demos"]:checked')].map(cb=>cb.value);
 
-  try {
-    const res = await fetch('/api/registro', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, demos }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      btn.style.display = 'none';
-      const successMsg = document.getElementById('successMsg');
-      document.getElementById('btnICS').href = '/api/ics/' + data.id;
-      successMsg.style.display = 'flex';
-    } else {
-      document.getElementById('errorMsg').style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Generar mi calendario →';
-    }
-  } catch {
-    document.getElementById('errorMsg').style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Generar mi calendario →';
+  if(!nombre || demos.length===0){
+    document.getElementById('errorMsg').style.display='block';
+    return;
   }
+
+  btn.disabled=true; btn.textContent='Generando…';
+
+  const icsContent = buildICS(demos);
+  const blob = new Blob([icsContent],{type:'text/calendar;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+
+  const link = document.getElementById('btnICS');
+  link.href     = url;
+  link.download = 'carthage-expobeauty.ics';
+
+  btn.style.display='none';
+  document.getElementById('successMsg').style.display='flex';
 }
 
 const folletos = {
